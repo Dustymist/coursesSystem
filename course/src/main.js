@@ -9,16 +9,14 @@ import less from 'less'
 import router from './router'
 import store from './store'
 import XEUtils from 'xe-utils'
-import VXEUtils from 'vxe-utils'
+// import VXEUtils from 'vxe-utils'
 import VXETable from 'vxe-table'
 import 'vxe-table/lib/index.css'
-
 
 Vue.use(ElementUI)
 Vue.use(less)
 Vue.use(Vuex)
 Vue.use(VXETable)
-
 
 Vue.config.productionTip = false
 
@@ -28,7 +26,7 @@ new Vue({
   el: '#app',
   router,
   store,
-  render: h=>h(App),
+  render: h => h(App),
   components: { App },
   template: '<App/>'
 }).$mount('#app')
