@@ -58,14 +58,14 @@
               type="text"
               size="small"
               v-if="checkReg(scope.row.courseId)"
-              @click="register(scope.row.courseId, scope.row.courseName)"
+              @click="register(scope.row)"
               >注册课程</el-button
             >
             <el-button
               type="text"
               size="small"
               v-else
-              @click="cancel(scope.row.courseId, scope.row.courseName)"
+              @click="cancel(scope.row)"
               style="color:red"
               >取消课程</el-button
             >
@@ -80,6 +80,7 @@
 import topbar from "../Topbar.vue";
 import "xe-utils";
 import XEUtils from "xe-utils";
+import { mapState } from "vuex";
 
 export default {
   data() {
@@ -91,13 +92,21 @@ export default {
     this.selectedItem();
   },
   methods: {
+
+    locate(){
+      //取得一个学号数组
+      let studentIdList= this.students.map(item => item.studentId)
+      //定位索引
+      let index = studentIdList.indexOf(this.$store.state.currentStudentId)
+      return index
+    },
+
     footerMethod({ columns, data }) {
       const means = [];
       const sums = [];
       const others = [];
-      console.log({ columns, data });
+      //console.log({ columns, data });
       columns.forEach((column, columnIndex) => {
-        console.log(columnIndex);
         if (columnIndex === 0) {
           means.push("平均");
           sums.push("总修学分");
@@ -111,14 +120,10 @@ export default {
           switch (column.property) {
             case "courseResult":
               for (let i = 0; i <= data.length - 1; i++) {
-                otherCell +=
-                  data[i].courseScore * this.toPoint(data[i].courseResult);
-                console.log(
-                  data[i].courseScore,
-                  this.toPoint(data[i].courseResult)
-                );
+                otherCell += data[i].courseScore * this.toPoint(data[i].courseResult);
+                //console.log(data[i].courseScore,this.toPoint(data[i].courseResult));
                 courseScoreSum += parseInt(data[i].courseScore);
-                console.log(courseScoreSum);
+                //console.log(courseScoreSum);
               }
               otherCell = (otherCell / courseScoreSum).toFixed(2);
               break;
@@ -151,54 +156,69 @@ export default {
       else if (score < 60) point = 0;
       return point;
     },
+
     selectedItem() {
-      this.selectedList = [];
+      //功能:向selectedList里面导入 courseId,courseName,courseInstitution,courseLecturer,courseScore,courseResult
+      //这些数据来自resultList 
 
-      //遍历学生数组
-      for (let i = 0; i < this.$store.state.students.length - 1; i++) {
-        //用studentId这个主键找对象
-        if (this.$store.state.students[i].studentId == this.$store.state.currentStudentId) {
-          let regIdArr = this.$store.state.students[i].regId;
-          let courseResult = "";
+      //找到当前的学生
+      let index = this.locate()
+      let studentId = this.students[index].studentId
 
-          //遍历这个array
-          for (let j = 0; j < regIdArr.length - 1; j++) {
-            //遍历courses
-            for (let k = 0; k < this.$store.state.courses.length - 1; k++) {
-              //找到对应的id
-              if (regIdArr[j] == this.$store.state.courses[k].courseId) {
-                //用resultList里面对象存的名为primaryKey的主键来找对象
-                for (let item of this.$store.state.resultList) {
-                  if (item.primaryKey == this.$store.state.students[i].studentId + this.$store.state.courses[k].courseId)
-                    courseResult = item.courseResult;
-                }
+      //拿出该学生已注册的课程编号
+      let regIdList =this.students[index].regId
 
-                //push数据进去
-                this.selectedList.push({
-                  courseId: this.$store.state.courses[k].courseId,
-                  courseName: this.$store.state.courses[k].courseName,
-                  courseInstitution: this.$store.state.courses[k].courseInstitution,
-                  courseLecturer: this.$store.state.courses[k].courseLecturer,
-                  courseScore: this.$store.state.courses[k].courseScore,
-                  courseResult: courseResult
-                });
-              }
-            }
-          }
+      //获取对应课程编号的课程学院和课程教师
+      let courseIdList_All = this.courses.map(item => item.courseId)
+      let institutionList_All = this.courses.map(item => item.courseInstitution)
+      let lecturerList_All = this.courses.map(item => item.courseLecturer)
+
+      let institutionList =[]
+      let lecturerList=[]
+      for(let i=0;i<regIdList.length;i++){
+        if(courseIdList_All.indexOf(regIdList[i]) != -1){
+          let index_id = courseIdList_All.indexOf(regIdList[i])
+          institutionList.push(institutionList_All[index_id])
+          lecturerList.push(lecturerList_All[index_id])
         }
       }
 
-      console.log(this.selectedList);
+      //创建该学生的primaryKeyList
+      let primaryKeyList = regIdList.map(item => studentId.toString() + item)
+
+      //创建resultList的primaryKeyList_All
+      let primaryKeyList_All = this.resultList.map(item => item.primaryKey)
+
+
+      //用primaryKey从resultList取出数据,并push入selectedList
+      for(let i=0; i<primaryKeyList.length;i++){
+        let primaryKey = primaryKeyList[i]
+        if(primaryKeyList_All.indexOf(primaryKey) != -1){
+
+          let index_pk = primaryKeyList_All.indexOf(primaryKey)
+          //Object.assign(this.selectedList,this.resultList[index_pk])
+
+          this.selectedList.push({
+            courseId: this.resultList[index_pk].courseId,
+            courseName: this.resultList[index_pk].courseName,
+            courseInstitution:institutionList[i],
+            courseLecturer:lecturerList[i],
+            courseScore:this.resultList[index_pk].courseScore,
+            courseResult:this.resultList[index_pk].courseResult,
+          })
+
+        }
+      }
     },
 
     checkReg(id) {
       //通过遍历定位学生,输出index
       let index = "";
       let studentFound = false;
-      for (let i = 0; i < this.$store.state.students.length - 1; i++) {
+      for (let i = 0; i < this.students.length - 1; i++) {
         if (
-          this.$store.state.students[i].studentId ==
-          this.$store.state.currentStudentId
+          this.students[i].studentId ==
+          this.currentStudentId
         ) {
           index = i;
           studentFound = true;
@@ -210,7 +230,7 @@ export default {
         return true;
       }
 
-      if (this.$store.state.students[index].regId.indexOf(id) != -1) {
+      if (this.students[index].regId.indexOf(id) != -1) {
         //找到有重复的
         return false;
       } else {
@@ -219,68 +239,81 @@ export default {
       }
     },
 
-    register(id, name) {
-      if (this.$store.state.currentStudentId == "") {
-        alert("请先登录账号");
-      } else {
-        for (let i = 0; i < this.$store.state.students.length - 1; i++) {
-          if (
-            this.$store.state.students[i].studentId ==
-            this.$store.state.currentStudentId
-          ) {
-            //定位该学生
+    register(row){
+      //获得当前学生的索引
+      let index = this.locate()
 
-            let [regId, regCourse] = [id, name];
+      //写入数据到students中的regId和regCourse中
+      this.students[index].regId.push(row.courseId)
+      this.students[index].regCourse.push(row.courseName)
+      //console.log(this.students[index])
 
-            if (this.$store.state.students[i].regId != "None") {
-              //如果该学生已经注册过任意课程了
-              regId = id + " " + this.$store.state.students[i].regId;
-              regCourse = name + " " + this.$store.state.students[i].regCourse;
-            }
+      //增加一个resultList元素
+      this.resultList.push({
+        primaryKey:this.students[index].studentId + row.courseId,
+        studentId: this.students[index].studentId,
+        studentName: this.students[index].studentName,
+        courseId: row.courseId,
+        courseName: row.courseName,
+        courseScore: row.courseScore,
+        courseResult:''
+        })
+      console.log(this.resultList)
 
-            this.$store.state.students.splice(i, 1, {
-              //改变该学生对应的数组内存储的对象
-              studentId: this.$store.state.students[i].studentId,
-              studentName: this.$store.state.students[i].studentName,
-              studentPassword: this.$store.state.students[i].studentPassword,
-              regInstitution: this.$store.state.students[i].regInstitution,
-              regId: regId,
-              regCourse: regCourse
-            });
-            console.log("注册成功");
-            break;
-          }
+      //本门课程的注册人数增加1
+      let courseId = row.courseId
+      let courseIdList = this.courses.map(item => item.courseId.toString())
+      for(let i=0;i<this.courses.length;i++){
+        if(courseIdList.indexOf(row.courseId.toString()) != -1){
+          let index_id = courseIdList.indexOf(row.courseId.toString())
+          this.courses[index_id].courseSize ++
         }
       }
+      
     },
 
-    cancel(id, name) {
-      for (let i = 0; i < this.$store.state.students.length - 1; i++) {
-        if (
-          this.$store.state.students[i].studentId ==
-          this.$store.state.currentStudentId
-        ) {
-          let regId = this.$store.state.students[i].regId.replace(id, ""); //删除regId中对应的courseId
-          let regCourse = this.$store.state.students[i].regCourse.replace(
-            name,
-            ""
-          ); //删除regCourse中对于的courseName
-          console.log(regId);
+    cancel(row) {
+      //获得当前学生的索引
+      let index = this.locate()
 
-          this.$store.state.students.splice(i, 1, {
-            //改变该学生对应的数组内存储的对象
-            studentId: this.$store.state.students[i].studentId,
-            studentName: this.$store.state.students[i].studentName,
-            studentPassword: this.$store.state.students[i].studentPassword,
-            regInstitution: this.$store.state.students[i].regInstitution,
-            regId: regId,
-            regCourse: regCourse
-          });
+      console.log(row)
+      //查询该课程是否已经锁定
+      
+      if(this.students[index].lockedId.indexOf(row.courseId.toString())!=-1){
+        alert('课程已锁定,无法取消')
+      }else{//执行删除操作
+        //删除regId数组中对应的courseId
+        let index_regId = this.students[index].regId.indexOf(row.courseId)
+        this.students[index].regId.splice(index_regId,1)
+        //删除regCourse数组中对应的courseName
+        let index_regName = this.students[index].regCourse.indexOf(row.courseName)
+        this.students[index].regCourse.splice(index_regName,1)
 
-          alert("取消成功");
+        //删除对应的resultList元素
+        let primaryKeyList = this.resultList.map(item => item.primaryKey)
+        let primaryKey= this.students[index].studentId + row.courseId
+        let index_primaryKey= primaryKeyList.indexOf(primaryKey)
+        this.resultList.splice(index_primaryKey,1)
+
+        //本门课程的注册人数减少1
+        let courseIdList = this.courses.map(item => item.courseId.toString())
+        for(let i=0;i<this.courses.length;i++){
+          if(courseIdList.indexOf(row.courseId.toString()) != -1){
+            let index_id = courseIdList.indexOf(row.courseId.toString())
+            this.courses[index_id].courseSize --
+          }
         }
+
       }
     }
+  },
+
+  computed:{
+    ...mapState(["students"]),
+    ...mapState(["currentStudentId"]),
+    ...mapState(["courses"]),
+    ...mapState(["resultList"])
+    
   },
   components: {
     topbar
